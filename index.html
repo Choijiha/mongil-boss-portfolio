@@ -2921,6 +2921,37 @@ else startBossImageLoads();
 // 게임을 열 때 모든 그림을 미리 불러 둠 → 그림이 바뀌는 순간에 깜빡이지 않음
 // cfg = 그 그림의 설정(크기·기준점), ready = 불러오기 성공, failed = 실패, white = 피격 번쩍임용 흰색 실루엣
 // source = 어디서 불러왔는지('embedded' HTML 안의 데이터 / 'file' 폴더의 파일), origW·origH = 원본 그림 크기, k = 원본 대비 비율
+// v277 사용자 '면접관 주소로 갔더니 보스 화질이 구려졌다 좋아졌다 해' → 처음 접속 때 큰 그림을 한꺼번에 받다가 원본 하나가 실패하면
+//   HTML 안의 줄인 사본(흐림)으로 바꾼 뒤 그대로 썼음. 이제 사본을 쓰는 동안 원본을 다시 받아 보고(1.5·3·4.5·6·7.5초 뒤, 최대 5번),
+//   받아지면 그 자리에서 원본으로 바꿈 (크기 비율 k = 1, 흰색 실루엣도 다시 만듦). 보이는 것만 바뀜
+const BOSS_ORIG_RETRY = { tries: 5, gap: 1.5 };
+function bossEntryWhite(entry) {
+  try {
+    const c = document.createElement('canvas');
+    c.width = entry.img.naturalWidth; c.height = entry.img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(entry.img, 0, 0);
+    g.globalCompositeOperation = 'source-in'; g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
+    entry.white = c;
+  } catch (e) { entry.white = null; }
+}
+function bossRetryOriginal(entry, n) {
+  if (!PAGE_CAN_LOAD_FILES || n >= BOSS_ORIG_RETRY.tries) return;
+  setTimeout(function () {
+    if (entry.source !== 'embedded') return;
+    const im = new Image();
+    im.onload = function () {
+      if (entry.source !== 'embedded') return;
+      entry.img = im; entry.source = 'file'; entry.ready = true; entry.failed = false;
+      entry.origW = im.naturalWidth; entry.origH = im.naturalHeight; entry.k = 1;
+      bossEntryWhite(entry);
+      bossOrigRetryLog.push(entry.cfg.file + ' 원본으로 바꿈 (' + (n + 1) + '번째)');
+    };
+    im.onerror = function () { bossRetryOriginal(entry, n + 1); };
+    im.src = entry.cfg.file + (entry.cfg.file.indexOf('?') < 0 ? '?retry=' : '&retry=') + (n + 1);
+  }, BOSS_ORIG_RETRY.gap * 1000 * (n + 1));
+}
+const bossOrigRetryLog = [];   // 확인용 기록 (화면에 안 나옴)
 function loadBossImage(cfg) {
   const entry = { cfg: cfg, img: new Image(), ready: false, failed: false, white: null,
                   source: '', embedded: null, origW: 0, origH: 0, k: 1 };
@@ -2948,10 +2979,11 @@ function loadBossImage(cfg) {
     onBossImageSettled();
   };
   entry.img.onerror = function () {
-    if (entry.source === 'file' && entry.embedded) {    // 폴더의 원본을 못 읽음 → HTML 안의 데이터로 대신 불러옴
-      entry.source = 'embedded';
-      entry.img.src = entry.embedded.url;
-      return;
+    if (entry.source === 'file' && entry.embedded) {    // 폴더의 원본을 못 읽음 → HTML 안의 데이터로 대신 불러옴
+      entry.source = 'embedded';
+      entry.img.src = entry.embedded.url;
+      bossRetryOriginal(entry, 0);                      // v277 공개 주소에서 처음 접속 때 원본을 못 받으면 흐린 사본이 계속 쓰였음 → 원본을 다시 받아 보고, 받아지면 바로 바꿈
+      return;
     }
     entry.failed = true;
     onBossImageSettled();
@@ -3132,6 +3164,9 @@ let missionScore = 0; // 미션 점수 (5단계 습격 무력화 성공 등). �
 BOSS_MAX_HP = bossMaxHpForStage(COMBAT_STAGE_START);   // 시작 단계의 총체력으로 맞춤
 let showHelp = false;         // 조작 설명판을 펼쳤는지 (H키)
 let showDebug = true;         // 테스트 단계 이름·디버그 문구를 보여줄지 (T키)
+// v277 사용자 'T 개발자 모드에서 키를 하나 더 눌러, 개발자 모드는 안 꺼지지만 맵 둘레 점선 테두리·위쪽 글씨 설명 같은 것들은 꺼지게'
+//   → Y키 (T 표시를 켠 동안) : 테스트 표시 화면 글씨·테두리만 숨김/보임. 테스트 키(4~0, 6, V, H 등)는 그대로 동작
+let debugOverlayHidden = false;
 // 화면 속도 기록 (보기만 하는 기록. 게임 진행에는 아무 영향이 없음)
 //   1초마다 : fps = 화면을 그린 횟수,  gap = 가장 길게 멈춘 시간(ms),  avg / peak = 한 번 계산하고 그리는 데 걸린 시간의 평균 / 최대(ms)
 //   log = 최근 10분의 기록 (렉이 걸렸을 때 실제 숫자를 확인하는 데 씀). 테스트 표시(T키)의 맨 아래 줄에 현재 값이 보임
@@ -4439,6 +4474,7 @@ window.addEventListener('keydown', function (e) {
   }
   // 테스트용 키(H, V, 6)는 T로 테스트 표시를 켠 동안에만 동작함 → 녹화 중에 잘못 눌러도 화면이 바뀌지 않음
   if (e.code === 'KeyH' && !e.repeat && (showDebug || showHelp)) showHelp = !showHelp;       // 조작 설명판 펼치기 / 접기
+  if (e.code === 'KeyY' && !e.repeat && showDebug) debugOverlayHidden = !debugOverlayHidden;   // v277 테스트 표시의 글씨·점선 테두리만 숨기기 (테스트 키는 그대로)
   if (e.code === 'KeyT' && !e.repeat) {                           // 테스트 단계 이름·디버그 문구 보이기 / 숨기기
     showDebug = !showDebug;
     if (!showDebug) showHelp = false;                             // 테스트 표시를 끄면 조작 설명판도 함께 닫음
@@ -11898,7 +11934,7 @@ function drawArena() {
       ctx.fillRect(-ARENA_R, -ARENA_R * TILT, ARENA_R * 2, ARENA_R * 2 * TILT);
       ctx.restore();
     }
-    if (showDebug) {                                       // T키(테스트 표시)를 켜면 실제 이동 경계선이 보임
+    if (showDebug && !debugOverlayHidden) {                // T키(테스트 표시)를 켜면 실제 이동 경계선이 보임 (v277 Y키로 숨김)
       ctx.save();
       ctx.strokeStyle = 'rgba(160, 255, 220, 0.8)';
       ctx.lineWidth = 2;
@@ -14974,7 +15010,7 @@ function drawActionSlots() {
 function drawHelpPanel() {
   ctx.textAlign = 'left';
   if (!showHelp) {
-    if (!showDebug) return;                       // 테스트 표시까지 숨긴 상태면 이 안내도 숨김 (이때는 H키도 동작하지 않음)
+    if (!showDebug || debugOverlayHidden) return; // 테스트 표시까지 숨긴 상태면 이 안내도 숨김 (이때는 H키도 동작하지 않음) · v277 Y키로 숨긴 동안도 숨김 (H키는 동작)
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     roundRectPath(14, 12, 96, 22, 6);
     ctx.fill();
@@ -14997,7 +15033,8 @@ function drawHelpPanel() {
     '0 : 20단계 무영 시작',
     '4 : 방출 시작',
     'V : 보스 표시 전환 (도형/이미지)',
-    'T : 테스트 표시 보이기/숨기기',
+    'T : 테스트 표시 보이기/숨기기',
+    'Y : 테스트 글씨·테두리만 숨기기',
     'H : 이 설명판 접기'
   ];
   const h = 40 + lines.length * 18;
@@ -15016,8 +15053,8 @@ function drawHelpPanel() {
 }
 
 // 테스트 표시 (오른쪽 위에 작게. T키로 보이고 숨김) : 테스트 단계 이름, 보스 표시 방식, 은신 기습 테스트의 현재 단계와 결과
-function drawDebugInfo() {
-  if (!showDebug) return;
+function drawDebugInfo() {
+  if (!showDebug || debugOverlayHidden) return;   // v277 Y키로 숨긴 동안도 안 그림
   const lines = [];
   lines.push({ text: DEV_BUILD_LABEL, color: 'rgba(255,255,255,0.6)' });
   lines.push({ text: '전투 단계 : ' + combatStage + ' (6키로 표시 테스트)', color: 'rgba(255,255,255,0.8)' });
