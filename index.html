@@ -171,7 +171,8 @@ const SKILL = {
     eCooldown: 6, eCooldownAdd: 2,  // E 대기시간 : 1단만 쓰면 6초, 한 단을 더 쓸 때마다 +2초 (3단까지 쓰면 10초)
     assistTime: 8, assistBonus: 0.5,// E 3단이 맞으면 : 이 시간 동안 다른 캐릭터의 '등장 공격' 피해가 50% 늘어남
     entryDamage: 20,                // 등장 공격(도약 내려찍기)의 피해
-    entryLeap: 150, entryTime: 0.45, entryHeight: 70,   // 도약 : 최대 이동 거리, 걸리는 시간, 뛰어오르는 높이
+    entryLeap: 150, entryTime: 0.45, entryHeight: 70,   // 도약 : 최대 이동 거리(v291부터 안 씀), 걸리는 시간, 뛰어오르는 높이
+    entryHome: true,                // v291 사용자 '교체·교체 반격 때 정확히 보스한테' → 거리 제한 없이 보스 몸 바로 앞으로, 뛰는 동안 보스를 따라감 (false = 예전 150 제한·처음 방향 고정)
     entryRadius: 75,                // 착지 지점의 피해 범위(반지름)
     ultDamage: [30, 50],            // 궁극기 : 올려베기 피해, 내려베기 피해
     ultRange: 168, ultArc: 160,     // 올려베기의 부채꼴 범위. 사용자 요청으로 140 → 168 (1.2배, 임시값)
@@ -5487,7 +5488,17 @@ function updateAct(dt) {
   const t0 = act.t;
   act.t += (act.name === 'counter') ? dt * COUNTER.speed : dt;   // v199 회피 반격만 빠르게 (다른 동작은 그대로)
   const L = act.lunge;
-  if (L && L.t1 > L.t0 && L.dist > 0) {         // 앞으로 나아감 (실제 위치가 매 순간 조금씩 움직임)
+  if (L && L.home != null && L.home !== 0 && L.t1 > L.t0 && boss.hp > 0) {   // v291 보스 따라 뛰기 : 남은 시간 동안 보스 몸 앞(간격 home)까지 남은 거리를 고르게 나눠 감
+    const u0 = clamp01((t0 - L.t0) / (L.t1 - L.t0)), u1 = clamp01((act.t - L.t0) / (L.t1 - L.t0));
+    if (u1 > u0 && u0 < 1) {
+      const S = bossAimSpot(), bx = S.x - player.x, by = S.y - player.y, len = Math.hypot(bx, by);
+      if (len > 0.001) {
+        const rest = Math.max(0, len - boss.r - player.r - L.home), f = (u1 - u0) / (1 - u0);
+        player.x += bx / len * rest * f; player.y += by / len * rest * f;
+        player.dirX = bx / len; player.dirY = by / len;
+      }
+    }
+  } else if (L && L.t1 > L.t0 && L.dist > 0) {         // 앞으로 나아감 (실제 위치가 매 순간 조금씩 움직임)
     const u0 = clamp01((t0 - L.t0) / (L.t1 - L.t0)), u1 = clamp01((act.t - L.t0) / (L.t1 - L.t0));
     const d = L.linear ? (u1 - u0) : (easeOut(u1) - easeOut(u0));
     player.x += L.x * L.dist * d;
@@ -5528,9 +5539,18 @@ function aimPoint(minR, maxR) {
   return { x: player.x + d.x * r, y: player.y + d.y * r };
 }
 // 보스 쪽 방향과 보스 몸까지 남은 거리 (등장 공격에 씀). 보스를 겨냥할 수 없으면 바라보는 쪽
+//   v291 사용자 '오필리아 교체·교체 반격 때 이상한 곳에 때려' → 교체 반격은 대부분 보스가 은신 중(습격·심연·무영)이라 예전엔 바라보던 쪽으로 뛰었음.
+//   → 은신 중이어도 보스가 살아 있으면 보스 쪽 (그 순간 피해가 들어가는지는 예전 규칙 그대로 circleHitsBoss가 정함)
+// v291 보스가 공중으로 뛰는 중이면 내려앉을 자리 (습격·무영 습격 도약 raid.toX·toY, 도약 내려찍기 boss.jumpToX·Y), 아니면 보스 자리
+//   (습격 교체 반격 구간은 보스가 아직 공중일 때 시작돼서, 공중의 보스를 쫓다가 되돌아오는 이상한 경로가 됐음)
+function bossAimSpot() {
+  if (raidActive() && raid.step === 'leap' && raid.toX != null) return { x: raid.toX, y: raid.toY };
+  if (boss.phase === 'jump' && !boss.jumpLanded && boss.jumpToX != null) return { x: boss.jumpToX, y: boss.jumpToY };
+  return { x: boss.x, y: boss.y };
+}
 function towardBoss() {
-  if (bossTargetable()) {
-    const bx = boss.x - player.x, by = boss.y - player.y, len = Math.hypot(bx, by);
+  if (boss.hp > 0 && gameState === 'playing') {
+    const S = bossAimSpot(), bx = S.x - player.x, by = S.y - player.y, len = Math.hypot(bx, by);
     if (len > 0.001) return { x: bx / len, y: by / len, edge: len - boss.r - player.r };
   }
   return { x: player.dirX, y: player.dirY, edge: Infinity };
@@ -5878,7 +5898,8 @@ function windPulse() {
 // ---------- 등장 공격 : 교체로 새로 나온 캐릭터가 나오자마자 하는 공격 (보스 쪽을 향함) ----------
 // 마지막 타격까지는 이동·회피로 끊을 수 없고, 다시 교체하면 끊김
 function startEntryAttack() {
-  const owner = current, b = towardBoss(), dx = b.x, dy = b.y;
+  const owner = current, b = towardBoss();
+  let dx = b.x, dy = b.y;                                  // v291 1번은 착지 순간 보스 쪽으로 다시 맞춤 (let)
   player.dirX = dx;
   player.dirY = dy;
   const ang = Math.atan2(dy, dx);
@@ -5895,9 +5916,11 @@ function startEntryAttack() {
     swing.range = ATTACK_RANGE;
     startAct('leap', C.entryTime + 0.14, {
       noDodge: true, lockUntil: C.entryTime + 0.04,
-      lunge: { x: dx, y: dy, dist: Math.max(0, Math.min(C.entryLeap, b.edge - 6)), t0: 0, t1: C.entryTime, linear: true },
+      // v291 : 최대 거리(entryLeap 150) 없이 보스 몸 바로 앞까지, 뛰는 동안 보스가 움직이면 따라감(home) → 항상 보스 앞에 착지 [사용자 지시]
+      lunge: { x: dx, y: dy, dist: (C.entryHome && isFinite(b.edge)) ? Math.max(0, b.edge - 6) : Math.max(0, Math.min(C.entryLeap, b.edge - 6)), t0: 0, t1: C.entryTime, linear: true, home: (C.entryHome && isFinite(b.edge)) ? 6 : 0 },
       arc: { h: C.entryHeight, t0: 0, t1: C.entryTime },
       events: [{ t: C.entryTime, fn: function () {
+        const nb = towardBoss(); if (nb.edge !== Infinity && SKILL.c1.entryHome) { dx = nb.x; dy = nb.y; player.dirX = dx; player.dirY = dy; }   // v291 착지 순간 보스 쪽으로
         const x = player.x + dx * 30, y = player.y + dy * 30;       // 착지한 자리의 바로 앞
         iceT = C.iceTime;
         // 착지 폭발과 얼음 기둥은 이펙트 그림으로 나옴. 타격 순간에 타격 지점에 한 번만 만들고, 생긴 자리에 고정됨 (피해와는 관계없음)
