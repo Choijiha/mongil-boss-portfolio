@@ -97,7 +97,11 @@ const STAMINA = {
 const ATTACK_COOLDOWN = 0.4;   // 공격 간격
 const ATTACK_DAMAGE   = 10;    // 공격 한 번의 피해
 const ATTACK_RANGE    = 95;    // 공격이 닿는 거리 (플레이어 중심에서)
-const ATTACK_ARC      = 100;   // 부채꼴 공격의 벌어진 각도(도)
+const ATTACK_ARC      = 100;   // 부채꼴 공격의 벌어진 각도(도)
+// v283 사용자 '오필리아 평타 범위 좀 늘려줘' → 오필리아 평타만 따로 C1_RANGE = 95 × 1.25 = 119 [임시]
+//   (ATTACK_RANGE 95 는 다른 곳 — 프란시스 등장 공격·5키 기습·사거리 계산 — 이 같이 쓰므로 그대로 둠)
+const C1_RANGE_MUL    = 1.25;
+const C1_RANGE        = Math.round(ATTACK_RANGE * C1_RANGE_MUL);
 
 // ---------- 1번 캐릭터(A)의 기본 공격 : 검 5연타 ----------
 // 타격당 피해(ATTACK_DAMAGE), 판정 범위(ATTACK_RANGE·ATTACK_ARC), 공격 간격(ATTACK_COOLDOWN)은 위 값을 그대로 씀
@@ -110,7 +114,10 @@ const SWORD_LENGTH      = 44;                        // 검 길이
 // ---------- 2번 캐릭터(B)의 기본 공격 : 주사기 투사체 던지기 ----------
 // 피해(ATTACK_DAMAGE)와 공격 간격(ATTACK_COOLDOWN)은 위 값을 그대로 씀
 const PROJECTILE_SPEED  = 700;                // 투사체가 날아가는 속도 (1초에 가는 거리)
-const PROJECTILE_RANGE  = ATTACK_RANGE * 3;   // 사거리 : 근접 공격 거리의 3배 (플레이어 중심에서 잰 거리)
+const PROJECTILE_RANGE  = ATTACK_RANGE * 3;   // 사거리 : 근접 공격 거리의 3배 (플레이어 중심에서 잰 거리)
+// v283 사용자 '프란시스 평타 길이 조금 늘려줘' → 주사기 평타 사거리만 285 × 1.2 = 342 [임시] (속도 그대로).
+//   PROJECTILE_RANGE 285 는 프란시스 E 최대 거리·지원 음파 사거리가 같이 쓰므로 그대로 둠
+const C2_SHOT_RANGE     = Math.round(PROJECTILE_RANGE * 1.2);
 const PROJECTILE_RADIUS = 5;                  // 투사체 앞끝(바늘)의 충돌 크기
 const THROW_ARM_TIME    = 0.18;               // 던질 때 팔을 내밀었다 거두는 동작 시간
 
@@ -155,10 +162,10 @@ const SKILL = {
     iceTime: 8,                     // 얼음 강화 지속시간 (E나 등장 공격을 쓰면 시작. 평타가 얼음 속성으로 바뀜)
     iceDamage: 15,                  // 얼음 강화 중의 평타 피해 (보통은 ATTACK_DAMAGE)
     eDamage: [12, 12, 22],          // E 1단, 2단, 3단의 피해
-    eRange: 115, eArc: 140,         // E의 부채꼴 범위 : 거리, 벌어진 각도(도)
+    eRange: 144, eArc: 140,         // E의 부채꼴 범위 : 거리, 벌어진 각도(도). v283 사용자 'E 범위 좀 늘려' 115 → 144 (×1.25) [임시]
     eTime: [0.42, 0.56, 0.52],      // E 각 단의 동작 시간 (1단 회전 베기, 2단 찌르고 올려 베기, 3단 뛰어올라 내리꽂기)
     eLunge: [0, 26, 34],            // E 각 단의 전진 거리
-    ePlungeRadius: 70,              // E 3단 : 내리꽂은 자리의 피해 범위(반지름)
+    ePlungeRadius: 88,              // E 3단 : 내리꽂은 자리의 피해 범위(반지름). v283 70 → 88 (×1.25) [임시]
     crystalTime: [1.0, 1.2, 1.8],   // 얼음 결정이 남아 있는 시간 : E 3단, 등장 공격, 궁극기 (보이기만 함. 피해는 꽂는 순간 한 번뿐)
     eWindow: 2.5,                   // E를 쓴 뒤 다음 단을 이어 쓸 수 있는 시간 (이 안에 E를 다시 눌러야 이어짐. 사이에 평타를 섞어도 됨)
     eCooldown: 6, eCooldownAdd: 2,  // E 대기시간 : 1단만 쓰면 6초, 한 단을 더 쓸 때마다 +2초 (3단까지 쓰면 10초)
@@ -438,7 +445,11 @@ const BOSS_MOVE_SPEED = 110;   // 보스가 걸어오는 속도 (참고 : 플레
 // v220 보스 크기 배율 (사용자 '보스 크기가 일정하지 않아 전체적으로 다 일정하게, 기존보다 좀 키우고, 모든 판정도 다 키우자') [임시값 1.2]
 //   그림(모든 보스 시트) · 보스 몸(boss.r) · 모든 보스 공격 범위·발생 위치를 같은 배율로. 실제 적용은 아래 bossSizeApply (RAID_EYE 다음)
 //   그림마다 다르게 그려진 크기는 BOSS_ART_FIX로 먼저 방향별 기본 자세에 맞춘 뒤 이 배율을 곱함
-const BOSS_SIZE = 1.4;    // v224 사용자 '전체적으로 보스 아주 조금만 더 키울까' → 1.2 → 1.26 (+5%), v227 '아주 조금만 더' → 1.3 (+3%), v231 '좀 더' → 1.4 (+8%) [임시값]. 판정도 같은 배율
+// v285 사용자 '보스 히트박스 좀 키우자, 잘 안 맞네' → 플레이어 공격이 보스에 맞는 범위만 boss.r × BOSS_HURT_MUL (105 → 약 137) [임시].
+//   보스 몸 충돌·보스 공격 범위·그림·자동 조준 거리는 그대로 boss.r. 맞는 판정 함수(평타 부채꼴·스킬 부채꼴·원·주사기·음파·지원 파동)만 bossHurtR() 를 씀
+const BOSS_HURT_MUL = 1.3;
+function bossHurtR() { return boss.r * BOSS_HURT_MUL; }
+const BOSS_SIZE = 1.4;    // v224사용자 '전체적으로 보스 아주 조금만 더 키울까' → 1.2 → 1.26 (+5%), v227 '아주 조금만 더' → 1.3 (+3%), v231 '좀 더' → 1.4 (+8%) [임시값]. 판정도 같은 배율
 // 공격 시작 거리 : 플레이어가 이 거리 안에 들어오면 멈추고 패턴을 시작함
 // (보스 중심 ~ 플레이어 중심 거리. 서로 딱 붙으면 91, 1타는 정면으로 약 145까지 닿음)
 const BOSS_ATTACK_RANGE = 135 * BOSS_SIZE;   // v220 보스 크기 배율
@@ -911,7 +922,7 @@ const EMIT = {
   fxTimes: [0.05, 0.07, 0.08, 0.12, 0.15, 0.18],                       // [임시값] 충격파 그림 컷 길이 (합 0.65초)
   ringK: [0.28, 0.71, 1, 1, 0.97, 0.91],                                // 충격파 그림 컷별 고리 가로 반지름 ÷ 최대 (그림에서 잼) → 판정 고리도 같은 크기로 퍼짐
   range: 3 * METER * BOSS_RANGE_RULE.wide,   // [기획서 3m × 초기 제안 ×2.0 = 252] → bossSizeApply에서 × BOSS_SIZE 한 번 (352.8)
-  damage: 30,                     // [임시값] 기획서 '상'
+  damage: 90,                     // [임시값] 기획서 '상' 30 → v280 사용자 '방출 터질 때 대미지 3배' 90 (맞는 피해 = 90 × 46 ±10% ≈ 3730~4550)
   knock: 2 * METER, knockTime: 0.2,   // [기획서 2m] 넉백 거리(지면) · 밀리는 시간 [임시]
   swapInv: 0.35,                  // [임시 해석] 교체 무적 (무영과 같은 값)
   recover: 0.3,                   // [임시값] 680f 뒤 다음 행동까지 빈틈
@@ -968,7 +979,7 @@ const DASH = {
   distance: 17 * METER,           // [사용자 v248] 714 (v247 14m, 예전 [기획서] 7m 294)
   width: 4 * METER,               // [기획서] 4m → bossSizeApply에서 × BOSS_SIZE 한 번 (235.2)
   accelTime: 0.25, accelMin: 0.35,   // [임시] 출발 가속 (ease out). 이동 거리·시간은 그대로 (속도를 맞춰 나눔)
-  damage: 20,                     // [임시값] 기획서 '중'
+  damage: 80,                     // [임시값] 기획서 '중' 20 → v290 사용자 '돌진 대미지 4배' 80 (맞는 피해 약 3,300~4,050)
   swapInv: 0.35,                  // [임시 해석] 교체 무적
   minDist: 4 * METER,             // [기획서 44쪽] 돌진 후보 조건 : 4m 이상
   cooldown: 18,                   // [임시 자동 연결] 재사용 대기 (처음에도 18초 뒤부터)
@@ -1012,8 +1023,12 @@ const SWIPE3 = {
   lockAt: 70 / 60,                                                    // [기획서] 1타 시작 = 방향 고정
   cutAt: [0, 70, 112, 130, 160, 225].map(function (f) { return f / 60; }),   // 컷 1~6 시작 [임시 : 2·4번 = 1·2타 시작, 3·5번 = 다음 준비, 6번 = 내려찍기]
   hitAt: [76 / 60, 136 / 60, 228 / 60],                               // [임시] 1·2·3타 타격 순간
-  fanArc: 90, fanRange: 3 * METER * BOSS_RANGE_RULE.fan,              // [기획서 90°·3m] → ×1.5 → bossSizeApply × BOSS_SIZE = 264.6
-  rectLen: 4 * METER, rectW: 4 * METER,                               // [기획서 4m × 4m] → bossSizeApply × BOSS_SIZE = 235.2
+  // v286 사용자 '3연 할퀴기 판정이 이상해, 멀리 있는데 맞아' → v247의 ×1.9(부채꼴 503·직사각형 447)를 빼고 앞발이 닿는 거리로 줄임 [임시] :
+  //   1·2타 부채꼴 반지름 220 (보스 몸 105 + 약 115), 3타 직사각형 길이 250 · 폭 220 (bossSizeApply × BOSS_SIZE 뒤 값. 이 공격은 bossRangeApply 배율 안 곱함)
+  //   v288 사용자 '3연 할퀴기 범위 늘려줘, 2배 정도' → 부채꼴 220 → 440, 직사각형 250×220 → 500×440 [임시]. 바닥 예고(swipeDrawWarn)는 같은 값이라 자동으로 따라감
+  fanArc: 90, fanRange: 440 / BOSS_SIZE,
+  rectLen: 500 / BOSS_SIZE, rectW: 440 / BOSS_SIZE,
+  warnFade: 0.12,                                                     // v286 바닥 범위 예고가 나타나는 시간 [임시]
   damage: [20, 20, 25],                                               // [임시]
   swapInv: 0.35, recover: 0.3, needBasic: 2,                          // [임시]
   // 그림 : 원본 루트 boss_swipe3_(right|left|back)_sheet.png (1536×1024, 3×2, 칸 512) · boss_swipe3_front_slash_sheet.png (1254×1254, 2×2, 칸 627, 1~4번 컷만)
@@ -1053,6 +1068,7 @@ const BREATH = {
   damage: 8,                      // [임시] 한 틱
   arc: 150, range: 5 * METER, rangeMul: 1.0,   // [기획서 150°·5m] → bossSizeApply × BOSS_SIZE × rangeMul = 294
   mouthFwd: [0.5, 1.5],           // [임시] 입의 지면 투영점 = 보스 중심에서 공격 방향으로 (입 화면 자리를 지면으로 옮긴 거리), boss.r × 0.5~1.5 안으로
+  nearPad: 60,                    // v290 [임시] 입 바로 앞 : 보스 중심에서 (G까지 거리 + 이 값) 안, 같은 150° 안이면 맞음 (몸에 붙어 있어도 맞게)
   backMouthH: 80,                 // [임시] 뒷모습(입이 안 보임)일 때 분사 시작 높이 = 지면 원점 위 화면 80 (× BOSS_SIZE 전 값 아님, 화면 값)
   swapInv: 0.35, recover: 0.3, cooldown: 20,   // [임시]
   // 충전 몸 = 기존 포효 시트 (RAID_ART.roar·roarDirs의 크기·기준점 그대로, v237 보정 포함, 떨림 없음, 포효 소리 없음) 1→2→3번(고개 들기) 컷 시작 [임시]
@@ -1833,31 +1849,31 @@ const PLAYER_SHEETS = [
 //           평타는 컷이 빨리 넘어가서 잔상이 너무 커지지 않게 짧고 옅게 잡아 둠
 //   trailMirror 는 예전 방식(코드로 계산한 궤적)의 좌우를 맞추던 값으로, 검 위치표가 없을 때만 쓰임
       // 1타 = 시트 ① (8컷) : 준비 3컷 → 4번째 컷이 타격 → 낮은 자세로 마무리
-      slash1: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.25, alpha: 0.55 }, timeline:[[0, 0], [3, 'hit1'], [4, 0.14], [7, 0.34]],
+      slash1: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.56, alpha: 0.55 }, timeline:[[0, 0], [3, 'hit1'], [4, 0.14], [7, 0.34]],   // v283 평타 범위 ×1.25 에 맞춰 잔상 reach 1.25 → 1.56 (slash1~5 같음)
                 back:  { sheet: 'atk1Back',  first: 0, count: 8, footX: 199, footY: 442, trailMirror: true },
                 front: { sheet: 'atk1Front', first: 0, count: 8, footX: 248, footY: 448, trailMirror: true },
                 left:  { sheet: 'atk1Left',  first: 0, count: 8, footX: 238, footY: 450 },
                 right: { sheet: 'atk1Right', first: 0, count: 8, footX: 167, footY: 460 } },
       // 2타 = 시트 ② (8컷) : 낮은 자세에서 시작 → 3번째 컷이 타격 → 검을 든 자세 → 낮은 자세로 마무리
-      slash2: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.25, alpha: 0.55 }, timeline:[[0, 0], [2, 'hit1'], [3, 0.15], [4, 0.24], [7, 0.42]],
+      slash2: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.56, alpha: 0.55 },timeline:[[0, 0], [2, 'hit1'], [3, 0.15], [4, 0.24], [7, 0.42]],
                 back:  { sheet: 'atk2Back',  first: 0, count: 8, footX: 203, footY: 440, trailMirror: true },
                 front: { sheet: 'atk2Front', first: 0, count: 8, footX: 196, footY: 409 },
                 left:  { sheet: 'atk2Left',  first: 0, count: 8, footX: 213, footY: 388 },
                 right: { sheet: 'atk2Right', first: 0, count: 8, footX: 158, footY: 436 } },
       // 3타 = 시트 ③ (8컷) : 웅크린 준비 → 2번째 컷이 타격 → 한 바퀴 돌아 낮은 자세로 마무리
-      slash3: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.25, alpha: 0.55 }, timeline:[[0, 0], [1, 'hit1'], [5, 0.27], [7, 0.37]],
+      slash3: { hitCuts: [2], combo: true, trail: { time: 0.07, reach: 1.56, alpha: 0.55 },timeline:[[0, 0], [1, 'hit1'], [5, 0.27], [7, 0.37]],
                 back:  { sheet: 'atk3Back',  first: 0, count: 8, footX: 264, footY: 390, trailMirror: true },
                 front: { sheet: 'atk3Front', first: 0, count: 8, footX: 205, footY: 365 },
                 left:  { sheet: 'atk3Left',  first: 0, count: 8, footX: 226, footY: 330, trailMirror: true },
                 right: { sheet: 'atk3Right', first: 0, count: 8, footX: 206, footY: 447 } },
       // 4타 = 시트 ④ (12컷) : 두 번 도는 회전 베기. 두 번째로 도는 순간(9번째 컷)이 타격. 검 궤적이 두 번 보여도 피해는 한 번
-      slash4: { hitCuts: [8], combo: true, trail: { time: 0.07, reach: 1.25, alpha: 0.55 }, timeline:[[0, 0], [8, 'hit1'], [11, 0.29]],
+      slash4: { hitCuts: [8], combo: true, trail: { time: 0.07, reach: 1.56, alpha: 0.55 },timeline:[[0, 0], [8, 'hit1'], [11, 0.29]],
                 back:  { sheet: 'atk4Back',  first: 0, count: 12, footX: 205, footY: 328 },
                 front: { sheet: 'atk4Front', first: 0, count: 12, footX: 203, footY: 372 },
                 left:  { sheet: 'atk4Left',  first: 0, count: 12, footX: 190, footY: 360 },
                 right: { sheet: 'atk4Right', first: 0, count: 12, footX: 159, footY: 385 } },
       // 5타 = 시트 ⑤ (8컷) : 준비 3컷 → 4번째 컷이 타격(마지막 수평 베기) → 검을 거두는 마무리
-      slash5: { hitCuts: [3], combo: true, trail: { time: 0.07, reach: 1.25, alpha: 0.55 }, timeline:[[0, 0], [3, 'hit1'], [4, 0.16], [5, 0.26], [7, 0.44]],
+      slash5: { hitCuts: [3], combo: true, trail: { time: 0.07, reach: 1.56, alpha: 0.55 },timeline:[[0, 0], [3, 'hit1'], [4, 0.16], [5, 0.26], [7, 0.44]],
                 back:  { sheet: 'atk5Back',  first: 0, count: 8, footX: 287, footY: 340 },
                 front: { sheet: 'atk5Front', first: 0, count: 8, footX: 240, footY: 353, trailMirror: true },
                 left:  { sheet: 'atk5Left',  first: 0, count: 8, footX: 247, footY: 329 },
@@ -3412,17 +3428,17 @@ function clearSwapFx() {
 const E_FX = {
   // 1단 검격 (12컷 중 그림이 있는 10컷) : 지면 고리 + 오른쪽 위로 솟는 검광. 고리의 중심이 캐릭터의 발밑 조금 위에 옴
   slash1: { file: 'char1_sprites/ophelia_fx_e_stage1_slash_sheet_clean.png', cols: 4, rows: 3, cellW: 319.5, cellH: 410.33,
-            anchor: [160, 300], size: 0.56, height: 18, forward: 0, lead: 0.128, split: true,
+            anchor: [160, 300], size: 0.70, height: 18, forward: 0, lead: 0.128, split: true,      // v283 E 범위 ×1.25 에 맞춰 0.56 → 0.70
             times: [0.032, 0.032, 0.032, 0.032, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04],
             front: { back: 0.35, front: 0.35, left: 0.35, right: 0.35 } },
   // 2단 검격 (12컷 중 11컷) : 아래에서 위로 자라는 큰 세로 초승달. 2번째 타격(올려 베기)에 맞춤. 초승달의 아래 끝이 발밑에 옴
   slash2: { file: 'char1_sprites/ophelia_fx_e_stage2_slash_sheet_clean.png', cols: 4, rows: 3, cellW: 319.5, cellH: 410,
-            anchor: [165, 385], size: 0.38, height: 0, forward: 8, lead: 0.14, split: false,
+            anchor: [165, 385], size: 0.475, height: 0, forward: 10, lead: 0.14, split: false,     // v283 ×1.25 (0.38 → 0.475, forward 8 → 10)
             times: [0.03, 0.03, 0.03, 0.03, 0.035, 0.035, 0.035, 0.035, 0.03, 0.03, 0.03],
             front: { back: 0.3, front: 0.85, left: 0.8, right: 0.8 } },
   // 3단 검격 (12컷) : 위에서 아래로 자라는 초승달. 6번째 컷(아래 끝이 지면에 닿아 번쩍임)이 타격 순간에 옴. 아래 끝이 타격 지점의 지면에 옴
   slash3: { file: 'char1_sprites/ophelia_fx_e_stage3_slash_sheet_clean.png', cols: 4, rows: 3, cellW: 319.5, cellH: 410,
-            anchor: [160, 368], size: 0.42, height: 0, forward: 42, lead: 0.128, split: false,      // forward 42 = 타격 지점(캐릭터 앞 55)보다 조금 몸 쪽. 그림 속 검과 떨어져 보이지 않게
+            anchor: [160, 368], size: 0.525, height: 0, forward: 52, lead: 0.128, split: false,     // forward = 타격 지점(캐릭터 앞 69)보다 조금 몸 쪽. 그림 속 검과 떨어져 보이지 않게. v283 ×1.25 (0.42 → 0.525, 42 → 52)
             times: [0.027, 0.027, 0.027, 0.027, 0.02, 0.04, 0.04, 0.04, 0.03, 0.03, 0.03, 0.03],
             front: { back: 0.3, front: 0.85, left: 0.8, right: 0.8 } },
   // 3단 지면 충격과 서리 (12컷 중 11컷) : 타격 순간에 타격 지점의 지면에 생기고, 생긴 자리에 고정됨
@@ -3430,7 +3446,7 @@ const E_FX = {
   //   burst = 1~6컷(충격·확산)의 컷별 시간,  fade = 9~11컷(소멸)의 컷별 시간. 그 사이에는 7~8컷(서리)이 남아 있음
   //   남아 있는 전체 시간은 기존 설정 crystalTime[0](1.0초)을 그대로 씀 → 서리가 남는 시간 = 1.0 - 0.21 - 0.21 = 0.58초
   //   anchors = 컷별 지면 중심점. 원본 시트가 줄마다 조금씩 어긋나 있어서(셋째 줄은 40픽셀 위) 줄마다 따로 적음. 크기는 모든 컷이 같음
-  impact: { file: 'char1_sprites/ophelia_fx_e_stage3_impact_sheet_clean.png', cols: 4, rows: 3, cellW: 319.5, cellH: 410, size: 0.54,
+  impact: { file: 'char1_sprites/ophelia_fx_e_stage3_impact_sheet_clean.png', cols: 4, rows: 3, cellW: 319.5, cellH: 410, size: 0.675,   // v283 범위 88 에 맞춰 0.54 → 0.675
             burst: [0.025, 0.025, 0.03, 0.035, 0.045, 0.05], fade: [0.07, 0.07, 0.07],
             anchors: [[158, 317], [158, 317], [158, 317], [158, 317], [162, 306], [162, 306], [162, 306], [162, 306],
                       [162, 268], [162, 268], [162, 268], [162, 268]] }
@@ -3791,7 +3807,8 @@ const C2_FX = {
   // 평타 투사체 : 날아가는 동안 8컷 반복. 그림은 바늘이 왼쪽을 향함 → 그릴 때 좌우를 뒤집어 진행 방향(화면에 보이는 방향)으로 돌림
   //   anchor = 바늘 끝 (모든 컷 (50, 265)). 이 점이 실제 충돌 위치(투사체의 x, y)에 옴
   //   blend = 손에서 나간 주사기가 이 거리만큼 날아가는 동안 실제 진행선으로 부드럽게 옮겨 감,  blendDown = 아래로 던질 때 그 거리를 더 늘리는 정도 (둘 다 임시 연출값)
-  projectile: { file: 'char2_sprites/francis_fx_basic_projectile_sheet_clean.png', anchor: [50, 265], size: 0.25, loop: 0.4, blend: 100, blendDown: 1.2 },
+  projectile: { file: 'char2_sprites/francis_fx_basic_projectile_sheet_clean.png', anchor: [50, 265], size: 0.25, loop: 0.4, blend: 100, blendDown: 1.2,
+                tail: 79, minAlpha: 0.12 },   // v281 tail = 바늘 끝(칸 x50)에서 손잡이 끝(칸 x~366)까지 길이 316px × 0.25 (그림에서 잼). v282 손에서 나온 뒤 tail 거리를 날아가는 동안 minAlpha → 1로 서서히 보임 [임시]
   // 평타 명중 : 실제로 맞은 위치에서 한 번. anchor = 반짝임의 중심
   hit: { file: 'char2_sprites/francis_fx_basic_hit_sheet_clean.png', anchor: [193, 263], size: 0.30,
          times: [0.03, 0.03, 0.04, 0.05, 0.05, 0.05, 0.05] },
@@ -4032,11 +4049,17 @@ function drawC2Projectile(p) {
   ctx.save();
   ctx.translate(pos[0], pos[1]);                       // 바늘 끝 = 실제 충돌 위치 (높이는 손 높이)
   ctx.rotate(ang);
-  if (p.hand) {                                        // 손을 지나간 부분만 보임 (막 나온 주사기의 뒤쪽이 캐릭터 몸을 뚫고 보이지 않게)
-    const lx = (p.hx - pos[0]) * Math.cos(ang) + (p.hy - pos[1]) * Math.sin(ang);
-    if (lx > -120) { ctx.beginPath(); ctx.rect(lx, -300, 600, 600); ctx.clip(); }
+  // 손을 지나간 부분만 보임 (막 나온 주사기의 뒤쪽이 캐릭터 몸을 뚫고 보이지 않게)
+  //   v281 사용자 '가만히 서서 공격하거나 뒤로 가면서 공격할 때 주사기 손잡이가 뚝 끊겨 보임' : 예전엔 손 자리에서 딱 잘라 그려서(뒤쪽 숨김), 팔을 거두거나 뒤로 움직이면
+  //   그 잘린 선이 빈 공중에 보였음 → 자르지 않음.
+  //   v282 사용자 '날아가는 느낌이 이상해졌고, 평타를 빨리 누르면 날아가다 말고 다시 돌아와' → v281의 '그림을 앞으로 밀기'를 뺌 (밀림이 줄거나 늘면서 속도가 고르지 않고 뒤로 가 보였음).
+  //   위치·속도는 v280과 같고, 손에서 나온 뒤 손잡이 길이(tail)만큼 날아가는 동안만 진하기가 minAlpha → 1로 부드럽게 올라감 (몸·팔과 겹친 동안 옅게, 잘린 선 없음). 판정·경로·맞는 위치 그대로
+  const flipY = Math.cos(ang) < 0 ? -1 : 1;
+  if (p.hand && F.tail) {
+    const u = clamp01((p.dist - p.d0) / F.tail), s = u * u * (3 - 2 * u);
+    ctx.globalAlpha *= (F.minAlpha || 0) + (1 - (F.minAlpha || 0)) * s;
   }
-  ctx.scale(-1, Math.cos(ang) < 0 ? -1 : 1);
+  ctx.scale(-1, flipY);
   drawFxCell(F, i, F.anchor[0], F.anchor[1], 0, 0, F.size, false);
   ctx.restore();
   return true;
@@ -4465,7 +4488,8 @@ window.addEventListener('keydown', function (e) {
   if ((e.code === 'Digit8' || e.code === 'Numpad8') && !e.repeat && showDebug && gameState === 'playing') specialDevStart();   // v189 노랑 특수 '기습 양손 할퀴기' 바로 시작 (테스트 표시를 켠 동안에만)
   if ((e.code === 'Digit9' || e.code === 'Numpad9') && !e.repeat && gameState === 'playing') abyssDevStart();     // v206 15단계 심연의 추격 바로 시작. v207 사용자 '테스트 키 넣어줘' → T 표시 없이도 (5키 기습처럼)
   if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat) shadowDevKey();    // v234 20단계 무영 바로 시작 (9키처럼 T 표시 없이도). v235 그로기·다른 기믹 중에도
-  if ((e.code === 'Digit4' || e.code === 'Numpad4') && !e.repeat) emitDevKey();      // v263 사용자 '방출만 볼 수 있게 키 따로' → 4키 = 방출 바로 시작
+  if ((e.code === 'Digit4' || e.code === 'Numpad4') && !e.repeat) emitDevKey();      // v263 사용자 '방출만 볼 수 있게 키 따로' → 4키 = 방출 바로 시작
+  if (e.code === 'KeyU' && !e.repeat) swipeDevKey();                                 // v287 사용자 '3타 할퀴기 시험 키 추가' → U키 = 3타 휘두르기 바로 시작 (4키처럼 T 표시 없이도)
   if ((e.code === 'Digit6' || e.code === 'Numpad6') && !e.repeat && showDebug && gameState === 'playing') {                // 전투 단계 표시 테스트 : 1 → 5 → 15 → 20 → 1 ...
     // Debug jump updates the matching maximum HP; score is not granted.
     const stageBefore = combatStage;
@@ -4604,7 +4628,9 @@ const SND_FILES = {
   a_ult: { f: '오필리아/오필리아_궁극기.wav', hit: 3.04 },      // 내려찍기에 맞춤 (파일의 2.35초 올려베기 소리도 게임의 올려베기와 거의 같은 때에 남). 앞 약 1.6초는 건너뜀
   a_swap: { f: '캐릭터교체/교체_오필리아로.wav' },                                               // 1번으로 교체 (등장 공격)
   a_dodge: { f: ['오필리아/오필리아_회피_01.wav', '오필리아/오필리아_회피_02.wav', '오필리아/오필리아_회피_03.wav', '캐릭터교체/교체_오필리아_회피.wav'] },
-  b_basic: { f: '프란시스/프란시스_평타.wav', cuts: [0, 0.37, 0.66, 1.12, 1.79, 2.12, 2.46, 2.84, 3.28, 3.59, 3.96] },   // 2번 평타 : 주사기 하나에 한 조각씩 차례로
+  b_basic: { f: '프란시스/프란시스_평타.wav', cuts: [0, 0.37, 0.66, 1.12, 1.79, 2.12, 2.46, 2.84, 3.28, 3.59, 3.96],   // 2번 평타 : 주사기 하나에 한 조각씩 차례로
+             use: [0, 1, 7, 8, 9] },   // v284 사용자 '중간에 여러 번 쏘는 소리 없애고 한 번 소리 나는 걸로' → 소리 크기로 잰 결과 한 번만 쏘는 조각(0·1·7·8·9번)만 돌려 씀.
+                                       //   빠진 조각 : 2번(0.66~1.12, 2번 쏨) · 3번(1.12~1.79, 3번) · 4번(1.79~2.12, 2번 겹친 듯) · 5번(2.12~2.46, 3번) · 6번(2.46~2.84, 2번) · 10번(3.96~끝, 3번). 파일은 그대로
   b_e_cast: { f: '프란시스/프란시스_E_시전.wav' },
   b_e_land: { f: '프란시스/프란시스_E_폭발.wav', gap: 0.5, hit: 0.41 },                          // 첫 마법탄이 떨어지는 순간에 맞춤 (E를 쓸 때 미리 예약함)
   b_ult: { f: '프란시스/프란시스_궁극기.wav', hit: 2.16 },      // 큰 주사기가 떨어지는 순간에 맞춤. 앞 약 1.4초는 건너뜀
@@ -4877,7 +4903,10 @@ function sndAct(name) {
     sndPlay((sndState.turn.aSet || 1) % 2 ? 'a_combo1' : 'a_combo2', { part: step, hitIn: firstHit });
   }
   else if (name === 'frost') sndPlay('a_e' + Math.max(1, Math.min(3, swing.step - 3)), { hitIn: lastHit });      // 1번 E 1~3단 (그 단의 마지막 타격에 맞춤)
-  else if (name === 'throw') sndPlay('b_basic', { part: sndNext('b_basic', SOUND.restartGap) });
+  else if (name === 'throw') {                                  // v284 use 가 있으면 그 조각들만 차례로
+    const n = sndNext('b_basic', SOUND.restartGap), U = SND_FILES.b_basic.use;
+    sndPlay('b_basic', { part: U ? U[n % U.length] : n });
+  }
   else if (name === 'vials') {
     sndPlay('b_e_cast');
     sndPlay('b_e_land', { hitIn: SKILL.c2.eFirst + SKILL.c2.eFlight });      // 첫 마법탄이 떨어지는 순간
@@ -5074,9 +5103,11 @@ function switchCharacter(index) {
   applyExitEffect(current);                // 퇴각 효과 : 물러나는 캐릭터가 남기는 효과
   party[index].swapCd = SWAP_COOLDOWN;     // 새로 나오는 캐릭터 : 교체 대기시간 시작 (물러나는 캐릭터에게는 새로 걸지 않음)
   current = index;
+  counterDefer.arm = counterSwap;   // v279 교체 반격 성공이면 보스 반응을 등장 공격이 닿는 순간까지 미룸
   ambushOnSwap();                   // 은신 기습의 교체 구간이었으면 카운터 성공 (실제로 다른 캐릭터로 바뀐 경우에만 여기까지 옴)
   raidOnSwap();                     // 5단계 습격의 교체 반격 (같은 조건 : 실제로 다른 캐릭터로 바뀐 경우에만)
   specialOnSwap();                  // v189 노랑 특수의 교체 반격 (노란 고리 구간. 교체 스킬은 아래에서 그대로 나감)
+  counterDefer.arm = false;
   emitOnSwap();                     // v238 방출의 교체 무적 기록 (반격 아님)
   dash.swapAge = 0;                 // v239 돌진의 교체 무적 기록 (반격 아님)
   swipe.swapAge = 0;                // v240 3타 휘두르기의 교체 무적 기록
@@ -5096,7 +5127,7 @@ function throwProjectile(dx, dy, owner) {
     x: player.x + dx * player.r,      // 몸 가장자리에서 출발 (지면 위치. 판정은 이 값으로 함)
     y: player.y + dy * player.r,
     dx: dx, dy: dy,
-    dist: player.r,                   // 플레이어 중심에서 잰 거리. PROJECTILE_RANGE에 닿으면 사라짐
+    dist: player.r,                   // 플레이어 중심에서 잰 거리. C2_SHOT_RANGE에 닿으면 사라짐 (v283)
     owner: owner,
     d0: player.r, hand: false, h: 0, ox: 0, oy: 0, hx: 0, hy: 0, blend: 1      // 그림 속 손에서 나가 보이게 하는 값 (보이는 위치에만 씀. setProjectileHand)
   };
@@ -5106,10 +5137,10 @@ function throwProjectile(dx, dy, owner) {
 
 // 투사체 이동과 충돌. 던진 뒤에는 캐릭터와 상관없이 혼자 날아감 (교체해도 계속 날아감)
 function updateProjectiles(dt) {
-  const hitR = boss.r + PROJECTILE_RADIUS;
+  const hitR = bossHurtR() + PROJECTILE_RADIUS;
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
-    const step = Math.min(PROJECTILE_SPEED * dt, PROJECTILE_RANGE - p.dist);   // 최대 사거리까지만 이동
+    const step = Math.min(PROJECTILE_SPEED * dt, C2_SHOT_RANGE - p.dist);   // 최대 사거리까지만 이동
 
     // 이번에 지나가는 직선 구간이 보스 몸(원)에 닿는지 검사 → 빠르게 날아도 뚫고 지나가지 않음
     if (bossTargetable()) {             // 은신 중인 보스는 그냥 지나감
@@ -5134,7 +5165,7 @@ function updateProjectiles(dt) {
     p.x += p.dx * step;
     p.y += p.dy * step;
     p.dist += step;
-    if (p.dist >= PROJECTILE_RANGE - 1e-6) projectiles.splice(i, 1);   // 빗나가면 최대 사거리에서 사라짐
+    if (p.dist >= C2_SHOT_RANGE - 1e-6) projectiles.splice(i, 1);   // 빗나가면 최대 사거리에서 사라짐
   }
 }
 
@@ -5163,7 +5194,7 @@ function updateWaves(dt) {
       w.fx = WAVE_FX_TIME;
       spawnC3WaveFx(w);                 // 공격 위치 이펙트 그림 (터지는 자리에서 한 번. 보이기만 함)
       // 음파 원이 보스 몸(발밑 그림자 원)에 닿으면 맞음. 터지는 순간 딱 한 번만 검사
-      if (bossTargetable() && Math.hypot(boss.x - w.x, boss.y - w.y) <= WAVE_RADIUS + boss.r) {
+      if (bossTargetable() && Math.hypot(boss.x - w.x, boss.y - w.y) <= WAVE_RADIUS + bossHurtR()) {
         if (hitBoss(ATTACK_DAMAGE, { owner: w.owner, element: 'wind', kind: 'basic' }) > 0) onWaveHit();
       }
     }
@@ -5239,7 +5270,7 @@ function tryAttack(targetX, targetY) {
   swing.dur = dur;
   swing.aim = Math.atan2(dy, dx);
   swing.color = color;
-  swing.range = ATTACK_RANGE;
+  swing.range = C1_RANGE;
   player.comboShown = step + 1;
   player.comboStep = (step + 1) % 5;
   player.comboTimer = C.comboGap[step] + COMBO_RESET_TIME * 0.6;   // 이 시간 안에 다시 공격해야 다음 타로 이어짐
@@ -5249,24 +5280,24 @@ function tryAttack(targetX, targetY) {
     if (!hit) return;
     hitBoss(amount, { owner: owner, element: iced ? 'ice' : null, kind: 'basic' });
     hitSpark(iced ? ICE_COLOR : '#ffffff', big);
-    if (iced) frostBurst(player.x + dx * (ATTACK_RANGE - 20), player.y + dy * (ATTACK_RANGE - 20), 26, big ? 7 : 3);
+    if (iced) frostBurst(player.x + dx * (C1_RANGE - 20), player.y + dy * (C1_RANGE - 20), 26, big ? 7 : 3);
   };
   const events = [];
   if (step < 3) {
     events.push({ t: dur * C.hitPoint, fn: function () {       // 검이 지나가는 순간 = 피해가 들어가는 순간
-      showSlash(dx, dy, ATTACK_RANGE, ATTACK_ARC, color);
+      showSlash(dx, dy, C1_RANGE, ATTACK_ARC, color);
       strike(damage, bossTargetable() && slashHitsBoss(dx, dy), false);
     } });
   } else if (step === 3) {
     // 4타 : 두 번 돌며 벰. 피해는 한 번(평타 피해의 절반), 둘레 전체에 닿음
     events.push({ t: dur * C.spinHit, fn: function () {
-      showSlash(dx, dy, ATTACK_RANGE, 360, color);
-      strike(Math.ceil(damage / 2), circleHitsBoss(player.x, player.y, ATTACK_RANGE), true);
+      showSlash(dx, dy, C1_RANGE, 360, color);
+      strike(Math.ceil(damage / 2), circleHitsBoss(player.x, player.y, C1_RANGE), true);
     } });
   } else {
     // 5타 : 마지막 수평 베기. 피해는 한 번(나머지 절반), 앞쪽 부채꼴
     events.push({ t: dur * C.hitPoint, fn: function () {
-      showSlash(dx, dy, ATTACK_RANGE, ATTACK_ARC, color);
+      showSlash(dx, dy, C1_RANGE, ATTACK_ARC, color);
       strike(damage - Math.ceil(damage / 2), bossTargetable() && slashHitsBoss(dx, dy), true);
     } });
   }
@@ -5283,8 +5314,9 @@ function slashHitsBoss(dx, dy) {
   const bx = boss.x - player.x;
   const by = boss.y - player.y;
   const dist = Math.hypot(bx, by);
-  if (dist > ATTACK_RANGE + boss.r) return false;
-  if (dist <= boss.r) return true;
+  const hr = bossHurtR();
+  if (dist > C1_RANGE + hr) return false;
+  if (dist <= hr) return true;
 
   const half = (ATTACK_ARC / 2) * Math.PI / 180;
   const ang = Math.atan2(dy, dx);
@@ -5296,8 +5328,8 @@ function slashHitsBoss(dx, dy) {
   for (const side of [-1, 1]) {
     const ex = Math.cos(ang + side * half);
     const ey = Math.sin(ang + side * half);
-    const along = Math.max(0, Math.min(ATTACK_RANGE, bx * ex + by * ey));
-    if (Math.hypot(bx - ex * along, by - ey * along) <= boss.r) return true;
+    const along = Math.max(0, Math.min(C1_RANGE, bx * ex + by * ey));
+    if (Math.hypot(bx - ex * along, by - ey * along) <= hr) return true;
   }
   return false;
 }
@@ -5328,7 +5360,7 @@ player.walkT = 0;        // 걸음 진행 정도
 player.sheet = { mode: '', dir: 'back', runT: 0, idleT: 0, runGap: 9, idleGap: 9, hold: 0,
                  who: -1, actLive: false, actName: '', actT: 0, actDef: null, actArt: null, actCut: 0,
                  animT: 0, actMarks: null };   // animT = 그 동작의 그림이 재생된 시간 (동작이 끝난 뒤에도 마무리 자세 동안 계속 흐름), actMarks = 컷 시간표
-slash.range = ATTACK_RANGE;   // 부채꼴 참격 효과의 크기 (공격마다 실제 판정 범위와 같게 맞춤)
+slash.range = C1_RANGE;   // 부채꼴 참격 효과의 크기 (공격마다 실제 판정 범위와 같게 맞춤)
 slash.arc = ATTACK_ARC;
 swing.range = ATTACK_RANGE;
 
@@ -5509,8 +5541,9 @@ function towardBoss() {
 function fanHitsBoss(dx, dy, range, arc) {
   const bx = boss.x - player.x, by = boss.y - player.y;
   const dist = Math.hypot(bx, by);
-  if (dist > range + boss.r) return false;
-  if (dist <= boss.r) return true;
+  const hr = bossHurtR();
+  if (dist > range + hr) return false;
+  if (dist <= hr) return true;
   const half = (arc / 2) * Math.PI / 180;
   const ang = Math.atan2(dy, dx);
   let diff = Math.atan2(by, bx) - ang;
@@ -5519,13 +5552,13 @@ function fanHitsBoss(dx, dy, range, arc) {
   for (const side of [-1, 1]) {
     const ex = Math.cos(ang + side * half), ey = Math.sin(ang + side * half);
     const along = Math.max(0, Math.min(range, bx * ex + by * ey));
-    if (Math.hypot(bx - ex * along, by - ey * along) <= boss.r) return true;
+    if (Math.hypot(bx - ex * along, by - ey * along) <= hr) return true;
   }
   return false;
 }
 // 바닥의 원 (x, y, 반지름 r)이 보스 몸에 닿는지
 function circleHitsBoss(x, y, r) {
-  return bossTargetable() && Math.hypot(boss.x - x, boss.y - y) <= r + boss.r;
+  return bossTargetable() && Math.hypot(boss.x - x, boss.y - y) <= r + bossHurtR();
 }
 
 // ---------- 피해 · 회복 · 강화 ----------
@@ -5739,7 +5772,7 @@ function frostStage() {
   if (!startCastFlash(d.x, d.y)) bursts.push({ x: player.x, y: player.y, t: 0.22, color: ICE_COLOR });
   // 이 단의 검격 그림을 예약함 (타격 순간에 맞춰 조금 먼저 나오기 시작함. 보이기만 하고 판정과는 관계없음)
   //   fx = true 면 검격 그림이 나오므로, 같은 역할의 예전 임시 표현(범위 참격선·서리 파편)은 그리지 않음 → 겹치지 않음
-  const PLUNGE = 55;                                     // 3단 : 캐릭터 앞 이 거리의 지면이 타격 지점
+  const PLUNGE = 69;                                     // 3단 : 캐릭터 앞 이 거리의 지면이 타격 지점 (v283 E 범위 ×1.25 에 맞춰 55 → 69)
   const hitT = dur * [0.45, 0.65, 0.8][s];               // 이 단의 (마지막) 타격 순간
   const fx = startESlash(s, d.x, d.y, hitT);
 
@@ -6101,7 +6134,7 @@ function updateSkillObjects(dt) {
     const g = rings[i];
     g.r += g.speed * dt;
     if (!g.hit && bossTargetable()) {
-      const edge = Math.hypot(boss.x - g.x, boss.y - g.y) - boss.r;      // 고리 중심에서 보스 몸까지의 거리
+      const edge = Math.hypot(boss.x - g.x, boss.y - g.y) - bossHurtR();      // 고리 중심에서 보스 몸(맞는 범위)까지의 거리
       if (edge <= g.max && g.r >= edge) {
         g.hit = true;
         if (hitBoss(g.damage, { owner: g.owner, element: g.element, kind: g.kind }) > 0) {
@@ -6259,6 +6292,8 @@ function damagePlayer(amount, opt) {
 // R키 : 체력·위치·진행 중인 패턴·효과를 모두 처음 상태로 (선택한 캐릭터는 그대로)
 function resetGame() {
   sndStopAll();                     // 나고 있던 효과음을 멈춤
+  swapSlow.t = 99;                  // v278 교체 반격 슬로우 끄기
+  counterDefer.list.length = 0; counterDefer.arm = false; counterDefer.firing = false;   // v279 미뤄 둔 교체 반격 반응 지움
   gameState = 'playing';
   battleTime = BATTLE_TIME;         // 전투 타이머도 처음으로
   totalDamage = 0;
@@ -7137,6 +7172,7 @@ function ambushOnSwap() {
 
 // 교체 카운터 성공 : 예정된 기습 공격을 취소하고 보스를 그로기로. 단계가 바뀌므로 다시 성공 처리되지 않음 (한 번만)
 function ambushCounterSuccess() {
+  if (counterDeferTry(ambushCounterSuccess, function () { ambush.hitDone = true; })) return;   // v279
   bossCancelPending();              // 취소된 공격의 피해가 뒤늦게 들어오지 않게 (공통 기반)
   bossGroggyStart('ambush', AMBUSH.groggyTime);   // 공통 그로기 (4초 그대로)
   ambush.hitDone = true;            // 기습 공격의 피해 판정은 더 이상 일어나지 않음
@@ -7144,6 +7180,7 @@ function ambushCounterSuccess() {
   ambush.msgT = AMBUSH.successMsgTime;
   ambush.result = '교체 카운터 성공 → 그로기';
   sndPlay('boss_countered');        // v260 교체 반격을 당한 보스 소리 (5키 시험)
+  swapSlowStart();                  // v278 교체 반격 슬로우
   ambush.resultT = AMBUSH.groggyTime + 2;
   cwaveSpawn();                     // v222 반격 성공 주황 파동 (5키 기습 시험도)
 }
@@ -7412,13 +7449,15 @@ function specialOnDodge() {
 function specialOnSwap() {
   if (!specialInWindow()) return;
   special.resolved = true;
-  sndPlay('boss_countered');                  // v260 교체 반격을 당한 보스 소리
+  swapSlowStart();                            // v278 교체 반격 슬로우 (판정 순간)
+  if (counterDeferTry(function () { specialSuccess('교체 반격'); })) return;   // v279 보스 반응은 등장 공격이 닿는 순간
   specialSuccess('교체 반격');
 }
 // 반격 성공 (회피 반격의 마지막 타격 또는 교체 반격) : 한 공격에 한 번
 function specialSuccess(how) {
   if (special.rewardPaid) return;
   special.rewardPaid = true;
+  if (how === '교체 반격') sndPlay('boss_countered');   // v260 교체 반격을 당한 보스 소리 (v279 보스 반응과 같은 순간으로 옮김)
   cwaveSpawn();                               // v222 반격 성공 주황 파동 (교체 반격 = 교체 순간, 회피 반격 = 마지막 타격 순간)
   bossCancelPending();
   for (const c of party) c.swapCd = 0;        // [기획서 14쪽] 모든 캐릭터 교체 대기 초기화
@@ -8220,9 +8259,11 @@ function raidOnSwap() {
 // 교체 반격 성공 : 이번 습격의 남은 피해 취소 → 은신·안개·피해 감소·회피 제한 해제 → 바로 그로기. 2타는 없음. 한 습격에 한 번만
 function raidCounterSuccess() {
   if (raid.resolved) return;
+  if (counterDeferTry(raidCounterSuccess, function () { raid.resolved = true; }, function () { raid.resolved = false; })) return;   // v279
   raid.resolved = true;
   cwaveSpawn();                              // v222 반격 성공 주황 파동
   sndPlay('boss_countered');                 // v260 교체 반격을 당한 보스 소리
+  swapSlowStart();                           // v278 교체 반격 슬로우
   bossCancelPending();                       // 공격 번호가 바뀜 → 이 습격의 피해가 뒤늦게 들어오지 않음
   for (const c of party) c.swapCd = 0;       // [기획서] 노랑 특수 반격 성공 : 모든 캐릭터의 교체 대기시간 초기화
   if (!raid.rewardPaid) {                    // [기획서 1쪽] 습격 무력화 성공 점수 (전투당 한 번)
@@ -8586,6 +8627,7 @@ function abyssOnSwap() {
 // 교체 반격 성공 (한 공격에 한 번) : 이 공격 취소, 교체 대기 초기화, 성공 +1. 1회째는 기믹을 끝내지 않음 (그로기·보상 없음)
 function abyssCounterSuccess() {
   if (raid.resolved) return;
+  if (counterDeferTry(abyssCounterSuccess, function () { raid.resolved = true; }, function () { raid.resolved = false; })) return;   // v279
   raid.resolved = true;
   cwaveSpawn();                              // v222 반격 성공 주황 파동 (1회째·2회째 모두)
   bossCancelPending();                       // 이 공격의 피해가 뒤늦게 들어오지 않음
@@ -8594,6 +8636,7 @@ function abyssCounterSuccess() {
   ambush.msgT = AMBUSH.successMsgTime;       // '교체 카운터 성공' 글자 (기존 표시)
   ambush.flashT = 0;
   sndPlay('boss_countered');                 // v260 교체 반격을 당한 보스 소리 (v259 보스 피격 소리 대신)
+  swapSlowStart();                           // v278 교체 반격 슬로우 (15·20단계)
   if (raid.abyssOk >= 2) { abyssWin(); return; }
   addFloatText(boss.x, boss.y, 175, '교체 반격 성공 1 / 2', '#ffe14d', '#3a2a00', 22);
   raid.result = raid.hit + '타 ' + abyssAtk().name + ' 교체 반격 성공 → 은신 절반 해제 (성공 1회)';
@@ -8873,6 +8916,7 @@ function shadowOnSwap() {
 // 교체 반격 성공 (한 공격에 한 번) : 그 공격 취소·교체 대기 초기화·주황 파동, 성공 수 +1 → 뒤쪽 → 몸통 → 머리 순서로 일반 모습. 그로기·미션 점수 없음
 function shadowCounterSuccess() {
   if (raid.resolved) return;
+  if (counterDeferTry(shadowCounterSuccess, function () { raid.resolved = true; }, function () { raid.resolved = false; })) return;   // v279
   raid.resolved = true;
   cwaveSpawn();
   bossCancelPending();
@@ -8880,6 +8924,7 @@ function shadowCounterSuccess() {
   raid.shadowOk = Math.min(3, raid.shadowOk + 1);
   ambush.msgT = AMBUSH.successMsgTime; ambush.flashT = 0;
   sndPlay('boss_countered');                 // v260 교체 반격을 당한 보스 소리 (v259 보스 피격 소리 대신)
+  swapSlowStart();                           // v278 교체 반격 슬로우 (15·20단계)
   if (raid.akind === 'ambush' && (raid.step === 'leap' || raid.step === 'swing')) {   // 도약 중이었으면 착지 지점으로 (습격 성공과 같음)
     boss.x = raid.toX; boss.y = raid.toY; boss.z = 0; boss.airborne = false; boss.angle = raid.aim;
   }
@@ -9989,7 +10034,11 @@ const BOSS_ART_FIX = {
 const BOSS_RANGE_MUL = 1.9, BOSS_RANGE_FX = 1.4, BOSS_RANGE_GIMMICK = 1.1, BOSS_RANGE_SPECIAL = 1.6;
 (function bossRangeApply() {
   const M = BOSS_RANGE_MUL;
-  SLAM.radius1 *= M; SLAM.radius2 *= M; SLAM.radius3 *= M; SLAM.smallForward *= M; SLAM.smallSide *= M; SLAM.bigForward *= M;   // 땅찍기 원 크기·자리
+  SLAM.radius1 *= M; SLAM.radius2 *= M; SLAM.radius3 *= M; SLAM.smallSide *= M; SLAM.bigForward *= M;   // 땅찍기 원 크기·자리
+  // v289 사용자 '3연 땅찍기 왼쪽·오른쪽 범위랑 이펙트가 이상해' → 1·2타 원의 앞쪽 거리 smallForward 를 ×1.9(279)에서 180으로 [임시].
+  //   279면 위·아래 방향은 화면에서 눌려(× TILT) 앞발 근처로 보이지만, 왼쪽·오른쪽은 그대로 279가 보여 원·충격 이펙트가 앞발보다 한참 앞에 생겼음.
+  //   그림 속 앞발이 실제로 땅을 찍는 자리 = 네 방향 모두 보스 중심에서 약 120~180 앞 (result_check\99_브레스_땅찍기_좌우\slam_paw_marks.jpg) → 180. 원 크기·옆 거리·3타는 그대로
+  SLAM.smallForward = 180;
   TAIL.range *= M; TAIL.hitWidth *= M;                 // 꼬리 사거리·굵기 (시작 조건 각도 120°·판정 각도는 그대로)
   JUMP.radius *= M;                                    // 도약 착지
   const G = BOSS_RANGE_GIMMICK, SP = BOSS_RANGE_SPECIAL;
@@ -10000,7 +10049,8 @@ const BOSS_RANGE_MUL = 1.9, BOSS_RANGE_FX = 1.4, BOSS_RANGE_GIMMICK = 1.1, BOSS_
   SPECIAL.range *= SP; SPECIAL.slashScale *= SP;       // 노랑 특수 (v248 1.6)
   EMIT.range *= M;                                     // 방출 충격파 (고리 그림 = 범위에 맞춤)
   DASH.width *= SP;                                    // 돌진 폭 (v248 1.6)
-  SWIPE3.fanRange *= M; SWIPE3.rectLen *= M; SWIPE3.rectW *= M; SWIPE3.crack.scale *= BOSS_RANGE_FX;   // 3타 휘두르기
+  // 3타 휘두르기 : v286부터 범위 배율 안 곱함 (SWIPE3 설정에서 직접 정한 거리). v288 범위 2배에 맞춰 3타 균열 그림은 다시 ×BOSS_RANGE_FX(1.4)
+  SWIPE3.crack.scale *= BOSS_RANGE_FX;
   BREATH.range *= M;                                   // 브레스 (분사 그림 = 범위 끝까지)
 })();
 
@@ -10972,6 +11022,20 @@ function swipeStart() {
   swipe.on = true; swipe.token = bossAttackBegin(); swipe.aim = boss.angle;
   swipe.done = [false, false, false]; swipe.result = ['', '', '']; swipe.basicDone = 0; swipe.count++;
 }
+// v287 U키 : 3타 휘두르기만 바로 보기 (4키 방출과 같은 규칙 — 전투 화면이면 언제든. 입장 중이면 그 자리에서 전투 개시,
+//   단계 기믹·5키 기습·노랑 특수·방출·돌진·브레스·다른 공격·그로기 중이면 끊고 시작. 이미 3타 휘두르기 중이거나 반격 대기·반격 중이면 무시)
+//   보스는 그 자리에서 플레이어 쪽을 보고 시작 (가까이 걸어오지 않음 → 멀면 빗나감)
+function swipeDevKey() {
+  if (appScreen !== 'battle') return;
+  if (entry.phase !== 'off') entrySkip();
+  if (gameState !== 'playing' || swipeActive() || counterBusy()) return;
+  if (bossBrain.running) bossGimmickCancel();
+  if (ambushRunning()) { bossCancelPending(); ambush.result = ''; ambush.msgT = 0; }
+  if (boss.phase === 'special') specialReset();
+  if (emitActive()) emitStop();
+  dashStop(); breathStop();
+  swipeStart();
+}
 // 시험용 (키 없음) : 지금 바로
 function swipeDevStart() {
   if (gameState !== 'playing' || bossBrain.running || raidActive() || ambushRunning() || boss.phase === 'special' || counterBusy() || emitActive() || dashActive() || swipeActive()) return;
@@ -11047,6 +11111,7 @@ function swipeDrawArt() {
 }
 // 바닥 : 3타 균열 (두 앞발 자리, 장식 — 판정은 직사각형 그대로) · 뒷모습 할퀴기 (몸 뒤)
 function swipeDrawFloor() {
+  swipeDrawWarn();
   swipeDrawSlashes(true);
   const im = shadowArt.crack, C = SHADOW.hb.crack;
   if (!im) return;
@@ -11059,6 +11124,38 @@ function swipeDrawFloor() {
     ctx.drawImage(im, (f % 3) * 512, Math.floor(f / 3) * 512, 512, 512, cx - C.ax * s, cy - C.ay * s, 512 * s, 512 * s);
     ctx.restore();
   }
+}
+// v286 사용자 '바닥 범위 장판도 안 보여' → 다음 타격의 실제 판정 범위(swipeInZone과 같은 모양·같은 방향)를 바닥에 그림.
+//   다른 보스 패턴과 같은 표시 : 옅은 빨강 = 전체 범위, 진한 빨강 = 타격까지 남은 시간 (가득 차면 그 타격). 1·2타 = 부채꼴, 3타 = 앞쪽 직사각형
+//   방향 : 1타 시작(lockAt) 전에는 보스가 플레이어를 따라 돌므로 같이 돎, 그 뒤 고정. 이전 타격 순간(1타는 패턴 시작)부터 다음 타격 순간까지 보임
+function swipeDrawWarn() {
+  if (!swipeActive() || gameState !== 'playing' || !bossAttackValid(swipe.token)) return;
+  let n = 0; for (let i = 0; i < 3; i++) if (!swipe.done[i]) { n = i + 1; break; }
+  if (!n) return;
+  const T = boss.phaseT, t0 = n === 1 ? 0 : SWIPE3.hitAt[n - 2], t1 = SWIPE3.hitAt[n - 1];
+  const k = clamp01((T - t0) / Math.max(0.01, t1 - t0));
+  const aim = T < SWIPE3.lockAt ? boss.angle : swipe.aim, ux = Math.cos(aim), uy = Math.sin(aim);
+  const shape = function (s) {
+    ctx.beginPath();
+    if (n < 3) {
+      const half = (SWIPE3.fanArc / 2) * Math.PI / 180, r = SWIPE3.fanRange * s;
+      ctx.moveTo(sx(boss.x), sy(boss.y));
+      for (let i = 0; i <= 18; i++) { const a = aim - half + (i / 18) * half * 2; ctx.lineTo(sx(boss.x + Math.cos(a) * r), sy(boss.y + Math.sin(a) * r)); }
+    } else {
+      const hw = SWIPE3.rectW / 2, L = SWIPE3.rectLen * s;
+      ctx.moveTo(sx(boss.x - uy * hw), sy(boss.y + ux * hw));
+      ctx.lineTo(sx(boss.x - uy * hw + ux * L), sy(boss.y + ux * hw + uy * L));
+      ctx.lineTo(sx(boss.x + uy * hw + ux * L), sy(boss.y - ux * hw + uy * L));
+      ctx.lineTo(sx(boss.x + uy * hw), sy(boss.y - ux * hw));
+    }
+    ctx.closePath();
+  };
+  ctx.save();
+  ctx.globalAlpha *= easeAt(T - t0, SWIPE3.warnFade, EASE.outQuad);
+  ctx.fillStyle = 'rgba(255, 60, 40, 0.20)'; shape(1); ctx.fill();
+  ctx.fillStyle = 'rgba(255, 60, 40, 0.38)'; shape(k); ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 110, 80, 0.95)'; ctx.lineWidth = 3; shape(1); ctx.stroke();
+  ctx.restore();
 }
 // 1·2타 할퀴기 (그 타격의 앞발 사선, 한 번에 한 장). behind = 뒷모습(몸 뒤 층)만 / 그 밖
 function swipeDrawSlashes(behind) {
@@ -11131,11 +11228,18 @@ function breathLockOrigin() {
 }
 // 입 화면 자리 (보스 지면점 기준, 그리는 좌표)
 function breathMouthOffset(c, d) { const p = breathMouthScreen(c, d); return { x: p.x - sx(boss.x), y: p.y - sy(boss.y) }; }
+// v290 사용자 '브레스가 입 쪽에 딱 붙어 있으면 안 맞는 것 같아' → 원점 G(입의 지면점)가 보스 중심에서 108~158 앞이라, 보스 몸에 붙은 캐릭터(중심에서 123)는 G보다 뒤라서 빗나갔음.
+//   → 보스 중심에서 같은 각도(150°)로 G까지 + nearPad 안도 맞음 (입 바로 앞 근처) [nearPad 임시]. 바깥 부채꼴(G 기준)은 그대로
+function breathNearR() { return Math.hypot(breath.gx - boss.x, breath.gy - boss.y) + BREATH.nearPad; }
 function breathInZone(aim) {
-  const dx = player.x - breath.gx, dy = player.y - breath.gy;
-  if (Math.hypot(dx, dy) > BREATH.range) return false;
-  let d = Math.atan2(dy, dx) - aim; d = Math.atan2(Math.sin(d), Math.cos(d));
-  return Math.abs(d) <= (BREATH.arc / 2) * Math.PI / 180;
+  const half = (BREATH.arc / 2) * Math.PI / 180;
+  const inFan = function (ox, oy, r) {
+    const dx = player.x - ox, dy = player.y - oy;
+    if (Math.hypot(dx, dy) > r) return false;
+    let d = Math.atan2(dy, dx) - aim; d = Math.atan2(Math.sin(d), Math.cos(d));
+    return Math.abs(d) <= half;
+  };
+  return inFan(breath.gx, breath.gy, BREATH.range) || inFan(boss.x, boss.y, breathNearR());
 }
 function breathTick(dt) {
   if (!bossBrainTimeFrozen() && !breathActive() && breath.cd > 0) breath.cd = Math.max(0, breath.cd - dt);   // 단계 기믹 중 멈춤, 그로기 중 흐름
@@ -11285,7 +11389,29 @@ function breathDrawGlow() {
     ctx.restore();
   }
 }
-function breathDrawFloor() { breathDrawStream(true); }
+function breathDrawFloor() { breathDrawWarn(); breathDrawStream(true); }
+// v289 사용자 '브레스 왼쪽·오른쪽 범위가 이상해' → 판정 부채꼴(입의 지면점 G에서 150°·range)은 분사 그림과 맞지만, 옆 방향에서는 넓은 부채꼴이 보스 가슴 위·아래 바닥까지 덮어
+//   분사 줄기가 지나가지 않는 곳에서도 맞는 것처럼 보였음 → 기 모으는 동안(0~100f) 다른 패턴과 같은 빨간 바닥 범위 예고 (분사가 시작되면 0.2초에 사라짐) [임시].
+//   방향은 모으는 동안 보스를 따라 돎(판정과 같음). 판정은 그대로
+function breathDrawWarn() {
+  if (!breathActive() || gameState !== 'playing' || !bossAttackValid(breath.token)) return;
+  const T = boss.phaseT, C = BREATH.chargeEnd;
+  if (T >= C + 0.2) return;
+  const k = clamp01(T / C), half = (BREATH.arc / 2) * Math.PI / 180, a = breath.aim;
+  const sub = function (ox, oy, r) {
+    ctx.moveTo(sx(ox), sy(oy));
+    for (let i = 0; i <= 30; i++) { const t = a - half + (i / 30) * half * 2; ctx.lineTo(sx(ox + Math.cos(t) * r), sy(oy + Math.sin(t) * r)); }
+    ctx.closePath();
+  };
+  // v290 판정과 같게 : G 기준 부채꼴 + 보스 중심 기준 입 앞 부채꼴을 한 모양으로 (겹친 곳이 두 번 진해지지 않게 한 경로로 채움)
+  const fan = function (s) { ctx.beginPath(); sub(breath.gx, breath.gy, BREATH.range * s); sub(boss.x, boss.y, breathNearR() * s); };
+  ctx.save();
+  ctx.globalAlpha *= easeAt(T, 0.25, EASE.outQuad) * (1 - easeAt(T - C, 0.2, EASE.inQuad));
+  ctx.fillStyle = 'rgba(255, 60, 40, 0.20)'; fan(1); ctx.fill();
+  ctx.fillStyle = 'rgba(255, 60, 40, 0.38)'; fan(k); ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 110, 80, 0.95)'; ctx.lineWidth = 3; ctx.beginPath(); sub(breath.gx, breath.gy, BREATH.range); ctx.stroke();
+  ctx.restore();
+}
 function breathDrawAir() { breathDrawStream(false); breathDrawGlow(); }
 // ---------- v243 기본 패턴 선택 정리 (사용자 지시 : 간략한 참고, 문제가 있는 규칙은 강제하지 않음) ----------
 //   선택 입구는 그대로 두 곳 : 빈틈(recover) 끝 = chooseBossAction (단계 기믹·방출 → 노랑 특수 → 돌진 → 브레스 → 꼬리 → 쉬기)
@@ -11595,7 +11721,8 @@ function updateBoss(dt) {
 // ##########################################################
 function update(dt) {
   updateEffects(dt);
-  if (gameState !== 'playing') { bossBrainOnBattleEnd(); battleEndBegin(); return; }// 전투가 끝나면 플레이어와 보스 모두 멈춤 (진행 중 기믹·임시 상태는 정리)
+  if (gameState !== 'playing') { counterDefer.list.length = 0; bossBrainOnBattleEnd(); battleEndBegin(); return; }// 전투가 끝나면 플레이어와 보스 모두 멈춤 (진행 중 기믹·임시 상태는 정리) · v279 미뤄 둔 반응도 지움
+  counterDeferTick(dt);       // v279 교체 반격 : 등장 공격이 닿는 순간에 보스 반응
 
   if (!bossBrainTimeFrozen()) battleTime = Math.max(0, battleTime - dt);   // 단계 기믹 진행 중에는 전투 제한시간이 멈춤 (그로기 중에는 흐름)
   bossBrainTick(dt);          // 방출 쿨타임 누적 (전투 제한시간과 따로) · 진행 중인 기믹
@@ -13081,7 +13208,7 @@ function drawSwingTrail() {
     const p = pStart + (pNow - pStart) * (i / N);
     const s = swingPose(swing.step, p);
     const a = swordPoint(swing.aim + s.yaw * mir, s.pitch, inner);
-    const b = swordPoint(swing.aim + s.yaw * mir, s.pitch, swing.range || ATTACK_RANGE);
+    const b = swordPoint(swing.aim + s.yaw * mir, s.pitch, swing.range || C1_RANGE);
     if (prevA) {
       ctx.globalAlpha = fade * (i / N) * (big ? 0.85 : 0.6);     // 꼬리 쪽일수록 옅게
       ctx.fillStyle = swing.color;
@@ -14440,7 +14567,7 @@ function drawSlash() {
     ctx.lineTo(p[0], p[1]);
   }
   ctx.closePath();
-  ctx.globalAlpha = k * (slash.range > ATTACK_RANGE ? 0.3 : 0.55);   // 범위가 넓은 스킬 베기는 더 옅게 (보스와 범위 예고를 가리지 않게)
+  ctx.globalAlpha = k * (slash.range > ATTACK_RANGE && slash.range !== C1_RANGE ? 0.3 : 0.55);   // 범위가 넓은 스킬 베기는 더 옅게 (보스와 범위 예고를 가리지 않게). v283 오필리아 평타(C1_RANGE)는 예전처럼 진하게
   ctx.fillStyle = slash.color;
   ctx.fill();
 
@@ -15031,7 +15158,8 @@ function drawHelpPanel() {
     '7 : 5단계 습격 바로 시작',
     '9 : 15단계 심연의 추격 시작',
     '0 : 20단계 무영 시작',
-    '4 : 방출 시작',
+    '4 : 방출 시작',
+    'U : 3타 할퀴기 시작',
     'V : 보스 표시 전환 (도형/이미지)',
     'T : 테스트 표시 보이기/숨기기',
     'Y : 테스트 글씨·테두리만 숨기기',
@@ -16305,8 +16433,8 @@ function drawResultScreen() {
     const pop = lit ? 1 + 0.45 * Math.max(0, 1 - (t - at) / 0.16) : 1;
     resultStar(x, y, 1, lit, pop);
   }
-  resultButton('retry', { x: 654, y: 532, w: 116, h: 34 }, '다시 하기', 'white');
-  resultButton('ok', { x: 780, y: 532, w: 154, h: 34 }, '확인', 'yellow', 'Space');
+  resultButton('retry', { x: 654, y: 532, w: 135, h: 34 }, '다시 하기', 'white');                 // v289 사용자 '다시 하기·확인 버튼 크기 같게' → 둘 다 폭 135 (전체 폭·사이 간격 10은 그대로)
+  resultButton('ok', { x: 799, y: 532, w: 135, h: 34 }, '확인', 'yellow', 'Space');
   ctx.restore();
   if (t < 0.35) { ctx.fillStyle = 'rgba(10,8,30,' + (1 - t / 0.35) + ')'; ctx.fillRect(0, 0, W, H); }   // 종료 연출에서 이어지는 밝아짐
 }
@@ -16517,6 +16645,7 @@ function entryKey(e) {
   if (e.code === 'KeyR' && !e.repeat) { partyBackToMenu(); return; }   // R : 기존 규칙 그대로 (빈 편성 화면)
   if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat) { shadowDevKey(); return; }   // v235 0키 시험 : 입장을 건너뛰고 바로 20단계 무영
   if ((e.code === 'Digit4' || e.code === 'Numpad4') && !e.repeat) { emitDevKey(); return; }     // v263 4키 시험 : 입장을 건너뛰고 바로 방출
+  if (e.code === 'KeyU' && !e.repeat) { swipeDevKey(); return; }                                // v287 U키 시험 : 입장을 건너뛰고 바로 3타 휘두르기
   if (entry.phase === 'roam') {
     if (e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD') keys[e.code] = true;   // 걷기만
     return;
@@ -16744,7 +16873,57 @@ function entryKeyBadge(label, x, cy, size) {
 // ##########################################################
 // 실제로 흐른 시간만큼 게임을 진행. 화면 FPS가 30이든 144든 같은 시간으로 재생되도록
 // 흐른 시간을 1/60초 이하의 작은 조각으로 나눠서 계산함
-function advance(seconds) {
+// v278 사용자 '교체 반격할 때도 슬로우 모션, 회피 반격만큼은 아니어도 조금 여유가 생기게'
+//   교체 반격 성공 순간부터 게임 전체(보스·캐릭터·이펙트)를 r0배로 느리게 → hold초 유지 → ramp초 동안 ease in으로 원래 속도.
+//   회피 반격(처음 0.06배, 보스 정지)보다 약하게 [임시값]. 전투 제한시간은 실제 시간대로 흐름(느려진 만큼 따로 깎음). 소리는 그대로
+// v279 사용자 '판정이 생겼을 때 초반에만 좀 슬로우, 그 뒤엔 원래 속도로' → hold 0.15 → 0.12, ramp 0.6 → 0.25 (전체 약 0.37초) [임시]. 보스도 같이 느려짐(게임 전체 배율)
+const SWAP_SLOW = { r0: 0.35, hold: 0.12, ramp: 0.25 };
+const swapSlow = { t: 99 };          // 교체 반격 성공 뒤 흐른 실제 시간 (99 = 꺼짐)
+function swapSlowStart() { if (counterDefer.firing) return; swapSlow.t = 0; }   // v279 미뤄 둔 반응을 실행할 때는 다시 시작하지 않음 (판정 순간에 이미 시작)
+// v279 사용자 '오필리아 교체 반격 성공 때 공격 모션이랑 보스가 교체 반격돼서 그로기 생기는 타이밍이 안 맞아, 둘이 맞춰줘'
+//   교체 반격이 성공하는 순간(교체 판정)에는 보스 공격 취소·중복 막기·슬로우만 하고, 보스의 반응(그로기·주황 파동·보스 소리·글자·보상·교체 대기 초기화)은
+//   새로 나온 캐릭터의 등장 공격이 닿는 순간까지 미룸 : 오필리아 = 내려찍기 착지(SKILL.c1.entryTime 0.45초) · 프란시스 = 올려치기(entryHit 0.14초) · 지원 = 음형 발사(entryHit 0.12초).
+//   게임 시간으로 셈(슬로우와 같이 느려짐) → 등장 공격과 정확히 같은 순간. 최대 max초 [임시]. on = false면 예전처럼 바로
+const SWAP_COUNTER_SYNC = { on: true, max: 0.8 };
+const counterDefer = { arm: false, firing: false, list: [] };
+function counterDeferDelay() {
+  const t = current === 0 ? SKILL.c1.entryTime : current === 1 ? SKILL.c2.entryHit : SKILL.c3.entryHit;
+  return Math.min(SWAP_COUNTER_SYNC.max, t);
+}
+// 교체 판정 중(arm)이면 반응을 미루고 true. pre = 지금 바로 할 일(중복·뒤늦은 피해 막기), unpre = 실행 직전에 되돌릴 일
+function counterDeferTry(fn, pre, unpre) {
+  if (!SWAP_COUNTER_SYNC.on || !counterDefer.arm || counterDefer.firing) return false;
+  if (pre) pre();
+  bossCancelPending();
+  swapSlowStart();
+  counterDefer.list.push({ fn: fn, unpre: unpre || null, t: counterDeferDelay() });
+  return true;
+}
+function counterDeferTick(dt) {
+  for (let i = 0; i < counterDefer.list.length; i++) {
+    const d = counterDefer.list[i];
+    d.t -= dt;
+    if (d.t > 0) continue;
+    counterDefer.list.splice(i, 1); i--;
+    counterDefer.firing = true;
+    try { if (d.unpre) d.unpre(); d.fn(); } finally { counterDefer.firing = false; }
+  }
+}
+function swapSlowRate() {
+  const S = SWAP_SLOW, t = swapSlow.t;
+  if (t >= S.hold + S.ramp) return 1;
+  if (t < S.hold) return S.r0;
+  const u = (t - S.hold) / S.ramp;
+  return S.r0 + (1 - S.r0) * u * u;
+}
+function advance(seconds) {
+  if (swapSlow.t < 99) {                                       // v278 교체 반격 슬로우
+    const real = seconds, k = swapSlowRate();
+    swapSlow.t += real;
+    if (swapSlow.t >= SWAP_SLOW.hold + SWAP_SLOW.ramp) swapSlow.t = 99;
+    seconds = real * k;
+    if (gameState === 'playing' && !bossBrainTimeFrozen()) battleTime = Math.max(0, battleTime - (real - seconds));   // 제한시간은 실제 시간대로
+  }
   while (seconds > 1e-9) {
     const step = Math.min(seconds, 1 / 60);
     update(step);
